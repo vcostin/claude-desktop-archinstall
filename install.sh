@@ -331,3 +331,12 @@ fi
 echo
 ok "Done. Installed version: $(cat "$APP/.deb-version" 2>/dev/null || echo '?')"
 echo "    Launch from your app menu (\"Claude\") or run: claude-desktop"
+# A new terminal picks up the CLI command automatically. An already-open shell
+# caches its command table, so the just-created ~/.local/bin/claude-desktop
+# symlink won't be found there until the table is refreshed — tell the user how.
+case "${SHELL##*/}" in
+  zsh)  rehint="rehash" ;;
+  fish) rehint="(fish rescans automatically)" ;;
+  *)    rehint="hash -r" ;;
+esac
+echo "    In your CURRENT shell, run '$rehint' first if the command isn't found yet."

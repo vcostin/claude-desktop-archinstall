@@ -106,6 +106,19 @@ skipped on Arch.
 The uninstaller reminds you about the two root-owned Cowork symlinks (it can't
 remove them without `sudo`).
 
+## Troubleshooting
+
+**`claude-desktop` not found right after installing, but works in a new terminal.**
+Your shell caches the list of commands in each `PATH` directory. The installer
+adds `~/.local/bin/claude-desktop` to an already-cached directory, so shells
+that were already open don't see it yet. Refresh the current shell:
+
+- zsh: `rehash` (or `source ~/.zshrc`)
+- bash: `hash -r`
+
+New terminals pick it up automatically. (If it's *also* missing in a brand-new
+terminal, make sure `~/.local/bin` is on your `PATH`.)
+
 ## How it's laid out
 
 ```
