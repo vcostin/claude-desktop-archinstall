@@ -179,7 +179,7 @@ else
   LATEST="$(cut -f1 "$TMP/latest")"
   FILE="$(cut -f2 "$TMP/latest")"
   SHA="$(cut -f3 "$TMP/latest")"
-  [ -n "$LATEST" ] && [ -n "$FILE" ] || die "could not parse latest version from repo"
+  if [ -z "$LATEST" ] || [ -z "$FILE" ]; then die "could not parse latest version from repo"; fi
   ok "Latest available: $LATEST"
 fi
 
@@ -323,7 +323,7 @@ if [ -n "$SELF" ] && [ -f "$SELF" ] && [ "$SELF" != "$DEST" ] \
 elif [ ! -f "$DEST" ]; then
   curl -fsSL "$SELF_URL" -o "$DEST" 2>/dev/null || warn "could not fetch a local copy of install.sh"
 fi
-[ -f "$DEST" ] && chmod +x "$DEST" || true
+if [ -f "$DEST" ]; then chmod +x "$DEST"; fi
 
 # -------------------------------------------- user-level desktop wiring -----
 log "Wiring up menu entry, CLI command, icons and MIME types…"
@@ -335,7 +335,7 @@ for sz in 16x16 32x32 48x48 128x128 256x256; do
   src="$ICONSRC/$sz/apps/claude-desktop.png"
   [ -f "$src" ] || src="$APP/resources/icon.png"
   dst="$HOME/.local/share/icons/hicolor/$sz/apps"
-  mkdir -p "$dst"; [ -f "$src" ] && cp -f "$src" "$dst/claude-desktop.png" || true
+  mkdir -p "$dst"; if [ -f "$src" ]; then cp -f "$src" "$dst/claude-desktop.png"; fi
 done
 
 mkdir -p "$HOME/.local/share/applications"
