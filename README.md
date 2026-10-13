@@ -97,16 +97,28 @@ reports as supported.
 
 ## Updating
 
-Re-run the script (`install.sh` or the copy in `~/Apps/claude-desktop/`). It
-only downloads when a newer version is published. There is **no background
-auto-update** — the Debian package's apt-repo registration is deliberately
-skipped on Arch.
+Re-run the installer — it only downloads when a newer version is published:
+
+```sh
+~/Apps/claude-desktop/install.sh
+```
+
+The `curl … | bash` one-liner from [Install](#install) updates too. There is
+**no background auto-update** — the Debian package's apt-repo registration is
+deliberately skipped on Arch.
 
 ## Uninstalling
 
+Remove the app and desktop integration (keeps your settings):
+
 ```sh
-~/Apps/claude-desktop/uninstall.sh            # remove app + integration (keeps settings)
-~/Apps/claude-desktop/uninstall.sh --purge    # also delete ~/.config/Claude
+~/Apps/claude-desktop/uninstall.sh
+```
+
+Also delete your data at `~/.config/Claude`:
+
+```sh
+~/Apps/claude-desktop/uninstall.sh --purge
 ```
 
 The uninstaller reminds you about the two root-owned Cowork symlinks (it can't
