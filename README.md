@@ -20,37 +20,29 @@ and the compatibility symlinks the app probes for at Debian paths).
 
 ## Install
 
-**Recommended — download, read, run.** It's a single ~400-line Bash file; please
-read it before running (that's true of any install script):
-
-```sh
-curl -fsSLO https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh
-less install.sh      # inspect it
-bash install.sh
-```
-
-Or clone:
-
-```sh
-git clone https://github.com/vcostin/claude-desktop-archinstall
-./claude-desktop-archinstall/install.sh
-```
-
-**One-liner** (convenient, but you're trusting this repo without reading it):
-
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh | bash
-# pass flags through the pipe:
-curl -fsSL .../install.sh | bash -s -- --force
 ```
 
-Whichever you use, the script itself verifies the downloaded Claude Desktop
-package against Anthropic's signing key before installing (see
-[Security](#security)).
+This **installs or updates** to the latest release — run it again any time. The
+script verifies the download against Anthropic's signing key before installing
+(see [Security](#security)), and drops a copy at `~/Apps/claude-desktop/install.sh`
+so you can update from there too.
 
-The same command **installs or updates** — run it again any time to pull the
-latest release. A copy of the script is dropped at
-`~/Apps/claude-desktop/install.sh` so you can update from there too.
+Pass flags by appending them after `--`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh | bash -s -- --force
+```
+
+**Prefer to read before running?** (Recommended for any install script.)
+Download it, skim `install.sh`, then run it:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh && less install.sh && bash install.sh
+```
+
+Or clone the repo and run `./install.sh`.
 
 ## What it does
 
