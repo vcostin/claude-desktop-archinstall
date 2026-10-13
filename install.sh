@@ -207,8 +207,11 @@ else
     if [ -n "${SHA:-}" ]; then
       log "Verifying SHA256…"
       if echo "$SHA  $DEB" | sha256sum -c - >/dev/null 2>&1; then
-        [ "$VERIFY" -eq 1 ] && ok "package verified — SHA256 chains to Anthropic's signature" \
-                            || ok "checksum verified (index was not signature-checked)"
+        if [ "$VERIFY" -eq 1 ]; then
+          ok "package verified — SHA256 chains to Anthropic's signature"
+        else
+          ok "checksum verified (index was not signature-checked)"
+        fi
       else
         die "checksum mismatch — refusing to install"
       fi
@@ -396,7 +399,7 @@ if [ "$DO_COWORK" -eq 1 ]; then
     if [ -e "$link" ]; then
       ok "shim already present: $link"
     elif [ -e "$target" ]; then
-      [ -L "$link" ] && log "Replacing stale shim: $link" || log "Creating shim: $link -> $target"
+      if [ -L "$link" ]; then log "Replacing stale shim: $link"; else log "Creating shim: $link -> $target"; fi
       as_root install -d "$(dirname "$link")"
       as_root ln -sf "$target" "$link"
       ok "shim created: $link"

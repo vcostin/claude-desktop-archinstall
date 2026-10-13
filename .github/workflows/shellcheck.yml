@@ -1,0 +1,12 @@
+name: shellcheck
+on:
+  push:
+  pull_request:
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # shellcheck ships preinstalled on ubuntu-latest runners.
+      - name: Lint install.sh
+        run: shellcheck install.sh
