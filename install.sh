@@ -307,10 +307,12 @@ if [ "$DO_COWORK" -eq 1 ]; then
 
   for entry in "$(ovmf_shim)" "$(viofs_shim)"; do
     link="${entry%%|*}"; target="${entry##*|}"
-    if [ -e "$link" ] || [ -L "$link" ]; then
+    # -e follows symlinks, so a dangling link (target gone, e.g. app dir was
+    # moved/reinstalled) reads as absent and gets recreated below.
+    if [ -e "$link" ]; then
       ok "shim already present: $link"
     elif [ -e "$target" ]; then
-      log "Creating shim: $link -> $target"
+      [ -L "$link" ] && log "Replacing stale shim: $link" || log "Creating shim: $link -> $target"
       as_root install -d "$(dirname "$link")"
       as_root ln -sf "$target" "$link"
       ok "shim created: $link"
