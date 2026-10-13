@@ -1,6 +1,7 @@
 # claude-desktop-archinstall
 
 [![shellcheck](https://github.com/vcostin/claude-desktop-archinstall/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/vcostin/claude-desktop-archinstall/actions/workflows/shellcheck.yml)
+[![latest release](https://img.shields.io/github/v/release/vcostin/claude-desktop-archinstall?label=latest)](https://github.com/vcostin/claude-desktop-archinstall/releases/latest)
 
 Install [Claude Desktop](https://claude.ai) on **Arch Linux** from Anthropic's
 official `.deb` — isolated in your home folder, rootless, with full desktop
@@ -253,6 +254,31 @@ The method behind this installer generalizes to any reasonably self-contained
 steps (inspect → map deps → relocate → integrate → verify) plus the
 app-specific gotchas, with Claude Desktop as the worked example. Drop it in
 `~/.claude/skills/deb-to-arch/` to have Claude follow it on your next `.deb`.
+
+## Releases
+
+The install one-liner always tracks the **latest** published version — re-run it
+to update:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh | bash
+```
+
+Current: see the [latest release](https://github.com/vcostin/claude-desktop-archinstall/releases/latest).
+
+| Version | Highlights |
+| --- | --- |
+| v1.6.0 | Parallel installs — per-install-id integration (`--name`) |
+| v1.5.1 | Key-rotation runbook (`KEY-ROTATION.md`) |
+| v1.5.0 | Multi-key allowlist for smooth signing-key rotation |
+| v1.4.0 | arm64 support (architecture auto-detection) |
+| v1.3.0 | Reusable `deb-to-arch` skill playbook |
+| v1.2.0 | Key-rotation canary, primary-fingerprint match, ShellCheck CI + badge |
+| v1.1.0 | GPG signature verification against Anthropic's pinned key |
+| v1.0.1 | Shell command-hash hint after install |
+| v1.0.0 | First validated release |
+
+Full notes: [all releases](https://github.com/vcostin/claude-desktop-archinstall/releases).
 
 ## License
 
