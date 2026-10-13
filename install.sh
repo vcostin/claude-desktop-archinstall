@@ -90,7 +90,9 @@ as_root() {
 # version_le A B  -> true if A <= B (numeric, dot-separated; uses sort -V)
 version_le() { [ "$1" = "$2" ] || [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" = "$1" ]; }
 
-for t in curl bsdtar ar xz sha256sum sort awk; do need "$t"; done
+# Always needed. Extraction tools (ar/bsdtar/xz) are checked only when we
+# actually unpack a .deb, so --check and verify-only runs don't require them.
+for t in curl sha256sum sort awk; do need "$t"; done
 
 # ------------------------------------------------- pinned signing key -------
 # Anthropic "Claude Code Release Signing" public key (fingerprint $PINNED_FP),
@@ -236,6 +238,7 @@ else
 
   # ------------------------------------------------------------ extract -----
   log "Extracting package…"
+  for t in ar bsdtar xz; do need "$t"; done
   ( cd "$TMP" && ar x "$DEB" )
   mkdir -p "$TMP/data"
   bsdtar -xf "$TMP"/data.tar.* -C "$TMP/data"
