@@ -13,26 +13,38 @@ and the compatibility symlinks the app probes for at Debian paths).
 
 > **Unofficial.** Not affiliated with or endorsed by Anthropic. The script
 > does not redistribute Claude Desktop — it downloads the official package
-> from `downloads.claude.ai` at runtime and verifies its SHA256.
+> from `downloads.claude.ai` at runtime and **cryptographically verifies it
+> against Anthropic's own signing key** (see [Security](#security)).
 
-## Quick install
+## Install
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh | bash
-```
-
-Pass flags through the pipe with `bash -s --`:
+**Recommended — download, read, run.** It's a single ~400-line Bash file; please
+read it before running (that's true of any install script):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh | bash -s -- --force
+curl -fsSLO https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh
+less install.sh      # inspect it
+bash install.sh
 ```
 
-Or clone and run it:
+Or clone:
 
 ```sh
 git clone https://github.com/vcostin/claude-desktop-archinstall
 ./claude-desktop-archinstall/install.sh
 ```
+
+**One-liner** (convenient, but you're trusting this repo without reading it):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh | bash
+# pass flags through the pipe:
+curl -fsSL .../install.sh | bash -s -- --force
+```
+
+Whichever you use, the script itself verifies the downloaded Claude Desktop
+package against Anthropic's signing key before installing (see
+[Security](#security)).
 
 The same command **installs or updates** — run it again any time to pull the
 latest release. A copy of the script is dropped at
@@ -105,6 +117,40 @@ skipped on Arch.
 
 The uninstaller reminds you about the two root-owned Cowork symlinks (it can't
 remove them without `sudo`).
+
+## Security
+
+The goal of this project is narrow: **distribution-compatibility installation of
+the genuine app, nothing else.** No telemetry, no bundled binaries, no
+third-party packager in the trust path.
+
+**What it verifies.** The installer pins Anthropic's apt-repo signing key
+(*Claude Code Release Signing*, fingerprint
+`31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE`) *inside the script* and
+checks the full chain before anything is installed:
+
+```
+pinned key ──▶ InRelease (GPG signature)
+                  └─▶ Release ──▶ SHA256(Packages)
+                                     └─▶ Packages ──▶ SHA256(.deb) ──▶ downloaded .deb
+```
+
+If the repository signature isn't from the pinned key, or any hash doesn't
+match the signed index, the script **aborts before downloading or installing**.
+This is stronger than a plain checksum: it verifies *authenticity* (it came
+from Anthropic), not just integrity over TLS.
+
+**Verify the pinned key yourself.** The same key ships inside the official
+`.deb`'s `postinst` and at Anthropic's published archive keyring, so you can
+confirm the fingerprint independently.
+
+**Flags.** `--insecure-skip-verify` disables the signature check (not
+recommended). A local `--deb` is installed as-is and is *not* signature-checked,
+since there's no signed index for an arbitrary file.
+
+**Still, read the script.** A `curl | bash` one-liner asks you to trust this
+repo. Inspecting `install.sh` first (it's short and commented) is the honest way
+to use it — especially given the 2026 wave of fake Claude Desktop installers.
 
 ## Troubleshooting
 

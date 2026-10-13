@@ -21,12 +21,20 @@
 #   ./install.sh --no-cowork  # skip QEMU/virtiofsd Arch adaptation
 #   ./install.sh --dir PATH   # install dir (default ~/Apps/claude-desktop)
 #   ./install.sh --deb FILE   # use a local .deb instead of downloading
+#   ./install.sh --insecure-skip-verify  # skip GPG signature check (discouraged)
 set -euo pipefail
 
 # ---------------------------------------------------------------- config ----
 APP="$HOME/Apps/claude-desktop"
 REPO="https://downloads.claude.ai/claude-desktop/apt/stable"
 ARCH="amd64"
+VERIFY=1
+# Anthropic's apt-repo signing key fingerprint ("Claude Code Release Signing").
+# The full public key is pinned inline below (see anthropic_key). You can verify
+# this is genuine independently: the identical key ships inside the official
+# .deb's postinst script, and is published at
+# https://downloads.claude.ai/.../claude-desktop-archive-keyring.asc
+PINNED_FP="31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
 # Where this script lives upstream, so a `curl | bash` run can drop a copy of
 # itself next to the app for future updates.
 SELF_URL="https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh"
@@ -47,6 +55,7 @@ while [ $# -gt 0 ]; do
     --no-cowork) DO_COWORK=0 ;;
     --dir) APP="$2"; shift ;;
     --deb) LOCAL_DEB="$2"; shift ;;
+    --insecure-skip-verify) VERIFY=0 ;;
     -h|--help) sed -n '2,30p' "$0" 2>/dev/null || echo "see https://github.com/vcostin/claude-desktop-archinstall"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
@@ -80,6 +89,73 @@ version_le() { [ "$1" = "$2" ] || [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | h
 
 for t in curl bsdtar ar xz sha256sum sort awk; do need "$t"; done
 
+# ------------------------------------------------- pinned signing key -------
+# Anthropic "Claude Code Release Signing" public key (fingerprint $PINNED_FP),
+# pinned in-script so trust does not depend on fetching a key over the network.
+anthropic_key() {
+cat <<'KEY_EOF'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQINBGnK73ABEACnbytJXkjweYrwIr0aLEFRlH+C0nF44KxFc7gQmJ6PjSPMGZAD
+dxZcaixU7zZl8WxEpVO0wLmIH8cf2zGOdyuZg1Yaugk1vHb2b8WBhAGCQJdPgB8W
+XquedepEYtk56uP/gCoTjJDUZluEGBHnlnuujSJ4orxEdhSykEoAUfJZGEILPpMd
+bphFt/Sn+Eb/TxM5jpKPdwnv8AShNF/1mZU1fWTQq9tRKJUakZj04gdaDFElQXak
+CtTij+GT6yoYCARSHwGO+PC/Pr6q4tc+D7LRjxSBvUWDoFSmlqb/PJ1hj9D/7I2O
+e4XXniAPWMR56KvxHlzOzrNQdJujbJdSkCwh1ZijkSd3y8ayW5WYUTGdRab99NUw
+agzlabe/VVF6kzJ0Scn5q3PihB2Y9Bwo0CKnkYk7a7KT77EWv0Kkq+VHmOtqX3a2
+hhX+b6a6ve9rzJ1qZYGj+obv/C3Sx1LzUjAfqVy7RJDf2uAoP5t2g8u/TkSpUxhM
+VEjZBkSxYZhMyzQM6t8IgkUfnSrIPTHixbDWARZ4beMOBjxyPZK1nP7OOrNR3TkK
+JtwLMQAabURCDnL0PjS0iwBTU4jtumBD1XSULyWuoTvMljrpQr1nV1oDyOt0OLqa
+KA2McWtd9PdXhC8y2EIg7TmrTlJLfHYbdmkiCYj4J49Q8HWkN/6WE+RTUwARAQAB
+tD5BbnRocm9waWMgQ2xhdWRlIENvZGUgUmVsZWFzZSBTaWduaW5nIDxzZWN1cml0
+eUBhbnRocm9waWMuY29tPokCUQQTAQoAOxYhBDHd3iTd+rZ59C170rqpKf8afsrO
+BQJpyu9wAhsPBQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheAAAoJELqpKf8afsrO
+l5IP/2I8X1dFy5xYczWB/coIxGjuzS/V6ByZGZZEJsbr04pmuHiFUykJqPGWGQ6q
+U0YF5iEwvEkaagS5m7DzhSEf3FM3Cgafax/6d70tar9Vr1D+w6uPfxetu7u/WYJp
+aolIsdh5fTrBh9zSM1Njl8FM8wG8CwZQjS33Oa7d8cwRkgdUWbt6LXgz+cTQNuBn
+BgW6Ks7oZFI25dfu0ojDR+aDFJg4+4wZoyDLPvJz1SIrJ5WFGs67zsx9SfS3yZnf
+XKmBe+f0dUy+GJ2nFZrXFf99+c0dPEHYO8DCeAHZizjkFrdYtUHdDU0YDYEGkLJa
+bE+pgcpkHf5EvsZzHsyDbl95W/eh7pcXMbwkN+W4CBYUE9X4uHhqzWaC5yAVRWUA
+1BJ9V4LjZfHPLEJt0I3TxzXiEg9/BVeaTYq9RjaxIFo9Nfk158HqJY6SA5jslBlx
+Gv/No8u+xVcze2UJyGVfEIUfm92+0UAIkny3+5cuVV0ICzJxXlXj0CnLM9Lt50wE
+p3suVwuBEviCbZ08eAH1Ht8gbBdSsiOkIU8CX3v/scwHHx5q0+NBL6xLrQObg13a
+tRXBlKObfElkPN3lTUbUnJOW4U8uSjH8VRP+AujKWMDFe7x0zCs+iYY1mTOvbrTS
+9n3CmZUmbynZ+E/QWNENpW/pDNZdWFy43PASmML5FHu4m9Sn
+=oqMI
+-----END PGP PUBLIC KEY BLOCK-----
+KEY_EOF
+}
+
+# Fetch the package index and verify it chains from the pinned key:
+#   pinned key → InRelease (GPG signature) → Release → SHA256(Packages).
+# Leaves a trusted $TMP/Packages behind. From there each .deb carries its own
+# SHA256 in the (now-verified) index, completing the chain to the download.
+fetch_verified_index() {
+  if [ "$VERIFY" -eq 0 ]; then
+    warn "signature verification DISABLED (--insecure-skip-verify) — not recommended"
+    curl -fsSL "$REPO/dists/stable/main/binary-$ARCH/Packages" -o "$TMP/Packages" \
+      || die "could not fetch package index"
+    return
+  fi
+  need gpg
+  log "Verifying repository signature against pinned Anthropic key $PINNED_FP …"
+  export GNUPGHOME="$TMP/gnupg"; mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
+  anthropic_key | gpg --batch --quiet --import 2>/dev/null || die "failed to import pinned key"
+  curl -fsSL "$REPO/dists/stable/InRelease" -o "$TMP/InRelease" || die "could not fetch InRelease"
+  gpg --batch --status-fd 3 --output "$TMP/Release" --decrypt "$TMP/InRelease" 3>"$TMP/gpgstatus" 2>/dev/null \
+    || die "InRelease signature verification FAILED"
+  grep -q "VALIDSIG $PINNED_FP" "$TMP/gpgstatus" \
+    || die "InRelease is not signed by the pinned Anthropic key — refusing to proceed"
+  ok "repository signature valid (signed by Anthropic)"
+  local want
+  want=$(awk '/^SHA256:/{f=1;next} /^[^ ]/{f=0} f && $3=="main/binary-'"$ARCH"'/Packages"{print $1}' "$TMP/Release" | head -1)
+  [ -n "$want" ] || die "signed Release has no SHA256 for binary-$ARCH/Packages"
+  curl -fsSL "$REPO/dists/stable/main/binary-$ARCH/Packages" -o "$TMP/Packages" || die "could not fetch Packages"
+  echo "$want  $TMP/Packages" | sha256sum -c - >/dev/null 2>&1 \
+    || die "package index hash does not match the signed Release — refusing to proceed"
+  ok "package index verified against signed Release"
+}
+
 # --------------------------------------------- resolve the latest release ---
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
@@ -88,10 +164,10 @@ if [ -n "$LOCAL_DEB" ]; then
   DEB="$LOCAL_DEB"
   LATEST="$(basename "$LOCAL_DEB" | sed -n 's/.*_\([0-9.]*\)_.*/\1/p')"
   log "Using local package: $DEB (version ${LATEST:-unknown})"
+  warn "a local --deb is NOT signature-verified (no signed index for an arbitrary file)"
 else
   log "Querying official repo for the latest version…"
-  curl -fsSL "$REPO/dists/stable/main/binary-$ARCH/Packages" -o "$TMP/Packages" \
-    || die "could not fetch package index from $REPO"
+  fetch_verified_index
   # Flatten stanzas to: version<TAB>filename<TAB>sha256, then pick the newest.
   awk '
     /^Version:/  {v=$2}
@@ -130,8 +206,12 @@ else
     curl -fL --progress-bar "$REPO/$FILE" -o "$DEB" || die "download failed"
     if [ -n "${SHA:-}" ]; then
       log "Verifying SHA256…"
-      echo "$SHA  $DEB" | sha256sum -c - >/dev/null 2>&1 \
-        && ok "checksum verified" || die "checksum mismatch — refusing to install"
+      if echo "$SHA  $DEB" | sha256sum -c - >/dev/null 2>&1; then
+        [ "$VERIFY" -eq 1 ] && ok "package verified — SHA256 chains to Anthropic's signature" \
+                            || ok "checksum verified (index was not signature-checked)"
+      else
+        die "checksum mismatch — refusing to install"
+      fi
     fi
   fi
 
