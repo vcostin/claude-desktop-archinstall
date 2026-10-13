@@ -124,6 +124,10 @@ The goal of this project is narrow: **distribution-compatibility installation of
 the genuine app, nothing else.** No telemetry, no bundled binaries, no
 third-party packager in the trust path.
 
+**Verification is on by default.** Every normal install performs the check
+below; there is no flag to enable. Disabling it requires an explicit
+`--insecure-skip-verify`.
+
 **What it verifies.** The installer pins Anthropic's apt-repo signing key
 (*Claude Code Release Signing*, fingerprint
 `31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE`) *inside the script* and
@@ -140,9 +144,24 @@ match the signed index, the script **aborts before downloading or installing**.
 This is stronger than a plain checksum: it verifies *authenticity* (it came
 from Anthropic), not just integrity over TLS.
 
-**Verify the pinned key yourself.** The same key ships inside the official
-`.deb`'s `postinst` and at Anthropic's published archive keyring, so you can
-confirm the fingerprint independently.
+**Verify the pinned key yourself.** The key embedded in the script is a
+*public* key (it can only verify signatures, never create them), and the same
+key ships inside the official `.deb`'s `postinst` and Anthropic's published
+archive keyring — so you can confirm it's genuine and public-only:
+
+```sh
+sed -n '/BEGIN PGP PUBLIC KEY BLOCK/,/END PGP PUBLIC KEY BLOCK/p' install.sh \
+  | gpg --show-keys --with-fingerprint
+```
+
+Expected output — note `pub` (a public key; a secret would show `sec`) and the
+fingerprint matching the one above:
+
+```
+pub   rsa4096 2026-03-30 [SCE]
+      31DD DE24 DDFA B679 F42D  7BD2 BAA9 29FF 1A7E CACE
+uid   Anthropic Claude Code Release Signing <security@anthropic.com>
+```
 
 **Flags.** `--insecure-skip-verify` disables the signature check (not
 recommended). A local `--deb` is installed as-is and is *not* signature-checked,
