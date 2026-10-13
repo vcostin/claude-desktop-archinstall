@@ -36,12 +36,14 @@ case "$(uname -m)" in
   *) echo "unsupported CPU architecture: $(uname -m) (repo serves amd64 and arm64)" >&2; exit 1 ;;
 esac
 VERIFY=1
-# Anthropic's apt-repo signing key fingerprint ("Claude Code Release Signing").
-# The full public key is pinned inline below (see anthropic_key). You can verify
-# this is genuine independently: the identical key ships inside the official
-# .deb's postinst script, and is published at
-# https://downloads.claude.ai/.../claude-desktop-archive-keyring.asc
-PINNED_FP="31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
+# Accepted apt-repo signing key fingerprints ("Claude Code Release Signing"),
+# space-separated. Verification passes if InRelease is signed by the PRIMARY of
+# ANY of these — so during a key rotation you can list old+new together (and
+# paste the new armored key into anthropic_keys below) and installs keep working
+# through the changeover. The pinned keys are genuine independently: the same
+# key ships inside the official .deb's postinst and Anthropic's published
+# archive keyring.
+PINNED_FPS="31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
 # Where this script lives upstream, so a `curl | bash` run can drop a copy of
 # itself next to the app for future updates.
 SELF_URL="https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh"
@@ -90,14 +92,20 @@ as_root() {
 # version_le A B  -> true if A <= B (numeric, dot-separated; uses sort -V)
 version_le() { [ "$1" = "$2" ] || [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" = "$1" ]; }
 
+# True if $1 is a non-empty fingerprint listed in $PINNED_FPS (the allowlist).
+fpr_allowed() { [ -n "$1" ] || return 1; case " $PINNED_FPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+
 # Always needed. Extraction tools (ar/bsdtar/xz) are checked only when we
 # actually unpack a .deb, so --check and verify-only runs don't require them.
 for t in curl sha256sum sort awk; do need "$t"; done
 
-# ------------------------------------------------- pinned signing key -------
-# Anthropic "Claude Code Release Signing" public key (fingerprint $PINNED_FP),
-# pinned in-script so trust does not depend on fetching a key over the network.
-anthropic_key() {
+# --------------------------------------------- pinned signing key(s) --------
+# Anthropic "Claude Code Release Signing" public key(s), pinned in-script so
+# trust does not depend on fetching a key over the network. To add a key during
+# a rotation: append its armored block below the existing one AND add its
+# primary fingerprint to PINNED_FPS above (gpg imports every block in the
+# stream, and verification accepts any allow-listed primary).
+anthropic_keys() {
 cat <<'KEY_EOF'
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
@@ -143,19 +151,19 @@ fetch_verified_index() {
     return
   fi
   need gpg
-  log "Verifying repository signature against pinned Anthropic key $PINNED_FP …"
+  log "Verifying repository signature against pinned Anthropic key(s): $PINNED_FPS …"
   export GNUPGHOME="$TMP/gnupg"; mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
-  anthropic_key | gpg --batch --quiet --import 2>/dev/null || die "failed to import pinned key"
+  anthropic_keys | gpg --batch --quiet --import 2>/dev/null || die "failed to import pinned key(s)"
   curl -fsSL "$REPO/dists/stable/InRelease" -o "$TMP/InRelease" || die "could not fetch InRelease"
   gpg --batch --status-fd 3 --output "$TMP/Release" --decrypt "$TMP/InRelease" 3>"$TMP/gpgstatus" 2>/dev/null \
     || die "InRelease signature verification FAILED"
   # VALIDSIG's LAST field is the primary key fingerprint; the first is the
   # signing (sub)key. Matching the primary means routine subkey rotation under
-  # the same primary key keeps verifying without any change to this script —
-  # only a full primary-key rotation would require updating the pinned key.
+  # the same primary key keeps verifying without any change here; the allowlist
+  # ($PINNED_FPS) additionally lets old+new primaries coexist during a rotation.
   primary_fpr="$(awk '$2=="VALIDSIG"{print $NF; exit}' "$TMP/gpgstatus")"
-  [ "$primary_fpr" = "$PINNED_FP" ] \
-    || die "InRelease is not signed by the pinned Anthropic key (got '${primary_fpr:-none}') — refusing to proceed"
+  fpr_allowed "$primary_fpr" \
+    || die "InRelease is not signed by a pinned Anthropic key (got '${primary_fpr:-none}'; allowed: $PINNED_FPS) — refusing to proceed"
   ok "repository signature valid (signed by Anthropic)"
   local want
   want=$(awk '/^SHA256:/{f=1;next} /^[^ ]/{f=0} f && $3=="main/binary-'"$ARCH"'/Packages"{print $1}' "$TMP/Release" | head -1)

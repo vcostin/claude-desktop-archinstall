@@ -182,7 +182,10 @@ since there's no signed index for an arbitrary file.
 routine signing-subkey rotation needs no change here. A full primary-key change
 is rare and would make installs fail *closed* (safe) until the pinned key is
 updated — so a weekly CI canary (`install.sh --check`) re-verifies the live repo
-and fails loudly if the pinned key ever stops matching.
+and fails loudly if the pinned key ever stops matching. For a smooth changeover,
+the pinned keys are an **allowlist** (`PINNED_FPS`): list the old and new primary
+fingerprints (and both armored keys) together and installs keep working
+throughout the rotation — verification accepts any pinned key.
 
 **Still, read the script.** A `curl | bash` one-liner asks you to trust this
 repo. Inspecting `install.sh` first (it's short and commented) is the honest way

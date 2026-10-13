@@ -105,6 +105,7 @@ pinned key ──▶ InRelease (gpg --verify) ──▶ Release ──▶ SHA256
 - Get the key from the `.deb`'s `postinst` (vendors often embed it) or the vendor's published keyring; **pin it in your script**, don't fetch it at runtime.
 - Match the **primary** key fingerprint (GPG `VALIDSIG`'s last field) so routine subkey rotation doesn't break you.
 - Add a scheduled CI "canary" that re-verifies the live repo against the pinned key, so a key rotation pages you before users hit failures.
+- Support an **allowlist** of pinned fingerprints (accept the signature if it matches any), so during an announced rotation you can ship old+new keys together and installs don't break on the changeover day.
 
 ### 10. Verify & definition of done
 - `ldd` clean; smoke-launch (`<binary> --version` or a short run); optional features detected.
