@@ -230,8 +230,12 @@ chmod +x "$APP/uninstall.sh"
 # so re-fetch from the canonical URL).
 rm -f "$APP/update-claude-desktop.sh"   # migrate from the pre-repo name
 DEST="$APP/install.sh"
-SELF="$(readlink -f "$0" 2>/dev/null || true)"
-if [ -n "$SELF" ] && [ -f "$SELF" ] && [ "$SELF" != "$DEST" ]; then
+# Resolve where we're running from. When piped (`curl | bash`) this is "bash",
+# not a real script file, so only treat it as our source if it's an actual
+# file whose first line is our shebang — otherwise fetch the canonical copy.
+SELF="$(readlink -f "${BASH_SOURCE[0]:-$0}" 2>/dev/null || true)"
+if [ -n "$SELF" ] && [ -f "$SELF" ] && [ "$SELF" != "$DEST" ] \
+   && IFS= read -r _l < "$SELF" && [ "$_l" = "#!/usr/bin/env bash" ]; then
   cp -f "$SELF" "$DEST"
 elif [ ! -f "$DEST" ]; then
   curl -fsSL "$SELF_URL" -o "$DEST" 2>/dev/null || warn "could not fetch a local copy of install.sh"
