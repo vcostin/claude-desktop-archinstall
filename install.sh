@@ -22,6 +22,7 @@
 #   ./install.sh --dir PATH   # install dir (default ~/Apps/claude-desktop)
 #   ./install.sh --deb FILE   # use a local .deb instead of downloading
 #   ./install.sh --insecure-skip-verify  # skip GPG signature check (discouraged)
+#   ./install.sh --check      # verify repo signature only, then exit (no install)
 set -euo pipefail
 
 # ---------------------------------------------------------------- config ----
@@ -41,6 +42,7 @@ SELF_URL="https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/m
 DO_COWORK=1
 FORCE=0
 LOCAL_DEB=""
+CHECK_ONLY=0
 
 # Arch adaptation symlinks the app probes for at Debian paths. virtiofsd points
 # into the app payload (the bundled binary); the firmware target comes from the
@@ -56,6 +58,7 @@ while [ $# -gt 0 ]; do
     --dir) APP="$2"; shift ;;
     --deb) LOCAL_DEB="$2"; shift ;;
     --insecure-skip-verify) VERIFY=0 ;;
+    --check) CHECK_ONLY=1 ;;
     -h|--help) sed -n '2,30p' "$0" 2>/dev/null || echo "see https://github.com/vcostin/claude-desktop-archinstall"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
@@ -144,8 +147,13 @@ fetch_verified_index() {
   curl -fsSL "$REPO/dists/stable/InRelease" -o "$TMP/InRelease" || die "could not fetch InRelease"
   gpg --batch --status-fd 3 --output "$TMP/Release" --decrypt "$TMP/InRelease" 3>"$TMP/gpgstatus" 2>/dev/null \
     || die "InRelease signature verification FAILED"
-  grep -q "VALIDSIG $PINNED_FP" "$TMP/gpgstatus" \
-    || die "InRelease is not signed by the pinned Anthropic key — refusing to proceed"
+  # VALIDSIG's LAST field is the primary key fingerprint; the first is the
+  # signing (sub)key. Matching the primary means routine subkey rotation under
+  # the same primary key keeps verifying without any change to this script —
+  # only a full primary-key rotation would require updating the pinned key.
+  primary_fpr="$(awk '$2=="VALIDSIG"{print $NF; exit}' "$TMP/gpgstatus")"
+  [ "$primary_fpr" = "$PINNED_FP" ] \
+    || die "InRelease is not signed by the pinned Anthropic key (got '${primary_fpr:-none}') — refusing to proceed"
   ok "repository signature valid (signed by Anthropic)"
   local want
   want=$(awk '/^SHA256:/{f=1;next} /^[^ ]/{f=0} f && $3=="main/binary-'"$ARCH"'/Packages"{print $1}' "$TMP/Release" | head -1)
@@ -158,6 +166,14 @@ fetch_verified_index() {
 
 # --------------------------------------------- resolve the latest release ---
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+
+# --check: run only the signature/index verification and exit. Used by the CI
+# "key canary" to detect if Anthropic ever rotates their primary signing key.
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  fetch_verified_index
+  ok "verification OK — live repo is signed by the pinned key and the index is intact"
+  exit 0
+fi
 
 if [ -n "$LOCAL_DEB" ]; then
   [ -f "$LOCAL_DEB" ] || die "no such file: $LOCAL_DEB"

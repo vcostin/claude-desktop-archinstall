@@ -173,6 +173,12 @@ uid   Anthropic Claude Code Release Signing <security@anthropic.com>
 recommended). A local `--deb` is installed as-is and is *not* signature-checked,
 since there's no signed index for an arbitrary file.
 
+**Key rotation.** Verification matches Anthropic's *primary* key fingerprint, so
+routine signing-subkey rotation needs no change here. A full primary-key change
+is rare and would make installs fail *closed* (safe) until the pinned key is
+updated — so a weekly CI canary (`install.sh --check`) re-verifies the live repo
+and fails loudly if the pinned key ever stops matching.
+
 **Still, read the script.** A `curl | bash` one-liner asks you to trust this
 repo. Inspecting `install.sh` first (it's short and commented) is the honest way
 to use it — especially given the 2026 wave of fake Claude Desktop installers.

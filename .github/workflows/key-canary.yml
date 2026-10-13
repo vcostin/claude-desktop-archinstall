@@ -1,0 +1,16 @@
+name: key-canary
+# Early warning if Anthropic rotates their primary signing key: this re-runs
+# the installer's own verification against the live repo. If the pinned key no
+# longer matches, the job fails (red X + notification) so the key in install.sh
+# can be updated before users hit install failures.
+on:
+  schedule:
+    - cron: '17 6 * * 1'   # weekly, Mondays 06:17 UTC
+  workflow_dispatch:        # allow manual runs
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the live repo still signs with the pinned key
+        run: bash install.sh --check
