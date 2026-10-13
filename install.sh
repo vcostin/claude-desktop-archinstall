@@ -5,8 +5,9 @@
 # apt repo, verifies it, and lays it down as an isolated, rootless install in
 # your home folder. Then applies the Arch-specific adaptation the Debian
 # package can't do itself: the pacman dependencies and the compatibility
-# symlinks (OVMF firmware + virtiofsd) that the app probes for at Debian
-# paths — i.e. it makes the .deb behave like a native Arch install, Cowork
+# symlinks (firmware + virtiofsd) that the app probes for at Debian paths,
+# for both amd64 and arm64 — i.e. it makes the .deb behave like a native
+# Arch install, Cowork
 # included. sudo is used only for those system steps, and only when something
 # is actually missing (it prompts for your password then).
 #
@@ -28,7 +29,12 @@ set -euo pipefail
 # ---------------------------------------------------------------- config ----
 APP="$HOME/Apps/claude-desktop"
 REPO="https://downloads.claude.ai/claude-desktop/apt/stable"
-ARCH="amd64"
+# CPU architecture, mapped to the Debian names the repo serves (amd64, arm64).
+case "$(uname -m)" in
+  x86_64|amd64)  ARCH="amd64" ;;
+  aarch64|arm64) ARCH="arm64" ;;
+  *) echo "unsupported CPU architecture: $(uname -m) (repo serves amd64 and arm64)" >&2; exit 1 ;;
+esac
 VERIFY=1
 # Anthropic's apt-repo signing key fingerprint ("Claude Code Release Signing").
 # The full public key is pinned inline below (see anthropic_key). You can verify
@@ -43,12 +49,6 @@ DO_COWORK=1
 FORCE=0
 LOCAL_DEB=""
 CHECK_ONLY=0
-
-# Arch adaptation symlinks the app probes for at Debian paths. virtiofsd points
-# into the app payload (the bundled binary); the firmware target comes from the
-# edk2-ovmf package.
-ovmf_shim()  { echo "/usr/share/OVMF/OVMF_CODE_4M.fd|/usr/share/edk2/x64/OVMF_CODE.4m.fd"; }
-viofs_shim() { echo "/usr/bin/virtiofsd|$APP/resources/virtiofsd"; }
 
 # ----------------------------------------------------------------- args -----
 while [ $# -gt 0 ]; do
@@ -401,34 +401,52 @@ ok "desktop integration ready"
 # --------------------------------- Arch adaptation (Cowork): pkgs + shims ---
 if [ "$DO_COWORK" -eq 1 ]; then
   log "Applying Arch adaptation for Cowork (QEMU micro-VM)…"
+  # Cowork's detection probes Debian paths that differ by CPU architecture:
+  # amd64 uses OVMF + qemu-system-x86_64, arm64 uses AAVMF + qemu-system-aarch64.
+  # The firmware target is resolved from candidate paths (edk2 layouts vary),
+  # so we don't bet on one path, and a miss only warns — never breaks install.
+  if [ "$ARCH" = "arm64" ]; then
+    qemu_pkg="qemu-system-aarch64"; qemu_bin="qemu-system-aarch64"; fw_pkg="edk2-aarch64"
+    fw_link="/usr/share/AAVMF/AAVMF_CODE.fd"
+    fw_candidates=(/usr/share/edk2/aarch64/QEMU_CODE.fd /usr/share/edk2-armvirt/aarch64/QEMU_CODE.fd /usr/share/AAVMF/AAVMF_CODE.fd)
+  else
+    qemu_pkg="qemu-system-x86"; qemu_bin="qemu-system-x86_64"; fw_pkg="edk2-ovmf"
+    fw_link="/usr/share/OVMF/OVMF_CODE_4M.fd"
+    fw_candidates=(/usr/share/edk2/x64/OVMF_CODE.4m.fd)
+  fi
+  fw_target=""; for c in "${fw_candidates[@]}"; do [ -e "$c" ] && { fw_target="$c"; break; }; done
+
   if command -v pacman >/dev/null 2>&1; then
     missing_pkgs=()
-    command -v qemu-system-x86_64 >/dev/null 2>&1 || missing_pkgs+=(qemu-system-x86)
-    ls /usr/share/edk2/x64/OVMF_CODE.4m.fd >/dev/null 2>&1 || missing_pkgs+=(edk2-ovmf)
+    command -v "$qemu_bin" >/dev/null 2>&1 || missing_pkgs+=("$qemu_pkg")
+    [ -n "$fw_target" ] || missing_pkgs+=("$fw_pkg")
     if [ "${#missing_pkgs[@]}" -gt 0 ]; then
       log "Installing packages: ${missing_pkgs[*]}"
       as_root pacman -S --needed --noconfirm "${missing_pkgs[@]}" \
         || warn "pacman install failed — install ${missing_pkgs[*]} manually for Cowork"
+      fw_target=""; for c in "${fw_candidates[@]}"; do [ -e "$c" ] && { fw_target="$c"; break; }; done
     else
-      ok "qemu-system-x86 and edk2-ovmf already present"
+      ok "$qemu_pkg and $fw_pkg already present"
     fi
   else
-    warn "pacman not found — skipping package install (Cowork needs qemu + OVMF)"
+    warn "pacman not found — skipping package install (Cowork needs qemu + firmware)"
   fi
 
-  for entry in "$(ovmf_shim)" "$(viofs_shim)"; do
-    link="${entry%%|*}"; target="${entry##*|}"
-    # -e follows symlinks, so a dangling link (target gone, e.g. app dir was
-    # moved/reinstalled) reads as absent and gets recreated below.
+  # Compatibility symlinks: firmware (per-arch) + the bundled virtiofsd.
+  # -e follows symlinks, so a dangling link (target gone, e.g. app dir was
+  # moved/reinstalled) reads as absent and gets recreated.
+  shims=("$fw_link|$fw_target" "/usr/bin/virtiofsd|$APP/resources/virtiofsd")
+  for entry in "${shims[@]}"; do
+    link="${entry%%|*}"; target="${entry#*|}"
     if [ -e "$link" ]; then
       ok "shim already present: $link"
-    elif [ -e "$target" ]; then
+    elif [ -n "$target" ] && [ -e "$target" ]; then
       if [ -L "$link" ]; then log "Replacing stale shim: $link"; else log "Creating shim: $link -> $target"; fi
       as_root install -d "$(dirname "$link")"
       as_root ln -sf "$target" "$link"
       ok "shim created: $link"
     else
-      warn "cannot create $link — target missing: $target"
+      warn "cannot create $link — target not found (${target:-none}); Cowork may need manual firmware setup on this arch"
     fi
   done
 else

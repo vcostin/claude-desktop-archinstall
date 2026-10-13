@@ -89,8 +89,13 @@ reports as supported.
 ## Requirements
 
 - Arch Linux (or an Arch-based distro with `pacman`)
+- **amd64 (x86_64) or arm64 (aarch64)** — the architecture is auto-detected and
+  the matching official build is fetched. Core install + signature verification
+  are validated on both; on arm64 the Cowork *firmware* shim (AAVMF) is
+  best-effort and warns rather than fails if the firmware package lays its files
+  at an unexpected path.
 - `curl`, `bsdtar` (`libarchive`), `binutils` (`ar`), `xz`, `coreutils`
-  (`sha256sum`, `sort`) — all base/commonly installed
+  (`sha256sum`, `sort`), `gpg` (`gnupg`) — all base/commonly installed
 - `sudo` (only for the Cowork system steps)
 - The Chromium sandbox uses unprivileged user namespaces, enabled by default
   on Arch — no setuid helper required.

@@ -136,6 +136,7 @@ Concrete values from adapting Anthropic's official `claude-desktop_amd64.deb`:
   - `/usr/share/OVMF/OVMF_CODE_4M.fd` → `/usr/share/edk2/x64/OVMF_CODE.4m.fd`
   - `/usr/bin/virtiofsd` → `~/Apps/claude-desktop/resources/virtiofsd` (bundled; the app only auto-uses its bundled copy on Ubuntu 22.x)
   - needs KVM + `/dev/vhost-vsock` (standard on Arch). Detection symbols in the asar: `Lyn` (firmware list), `Ryn` (virtiofsd paths), `Jyn` (kvm/vsock).
+  - **arm64 differs:** the app probes `/usr/share/AAVMF/AAVMF_CODE.fd` and `qemu-system-aarch64` (Arch pkgs `edk2-aarch64` + `qemu-system-aarch64`). The architecture is auto-detected from `uname -m`; firmware edk2 layouts vary, so resolve the target from candidate paths and warn (don't fail) if none match.
 - **Trust:** repo `https://downloads.claude.ai/claude-desktop/apt/stable`; signing key *Anthropic Claude Code Release Signing*, fingerprint `31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE` (pin it; it also ships in the `.deb`'s `postinst`).
 - **Skipped from postinst:** apt-repo registration, AppArmor userns profile, GNOME search-provider wiring — all Debian/Ubuntu-specific.
 
