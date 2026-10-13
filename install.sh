@@ -260,6 +260,11 @@ else
 fi
 
 # ------------------------------------------------- write helper scripts -----
+# Ensure $APP exists regardless of how we got here (fresh install already
+# created it; an up-to-date run relies on it pre-existing — this makes the
+# section self-sufficient). mkdir -p creates ~/Apps and any missing parents.
+mkdir -p "$APP"
+
 # launch.sh (relocatable launcher)
 cat > "$APP/launch.sh" <<'LAUNCH_EOF'
 #!/usr/bin/env bash
