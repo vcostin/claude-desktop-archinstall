@@ -212,6 +212,15 @@ terminal, make sure `~/.local/bin` is on your `PATH`.)
 ~/.local/share/icons/hicolor/*/apps/claude-desktop.png
 ```
 
+## Adapting other `.deb` apps
+
+The method behind this installer generalizes to any reasonably self-contained
+`.deb`. It's written up as a reusable playbook (a Claude Code skill) at
+[`skills/deb-to-arch/SKILL.md`](skills/deb-to-arch/SKILL.md) — the generic
+steps (inspect → map deps → relocate → integrate → verify) plus the
+app-specific gotchas, with Claude Desktop as the worked example. Drop it in
+`~/.claude/skills/deb-to-arch/` to have Claude follow it on your next `.deb`.
+
 ## License
 
 [MIT](LICENSE) © Vadim Costin
