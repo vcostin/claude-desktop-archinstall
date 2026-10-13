@@ -21,6 +21,7 @@
 #   ./install.sh --force      # reinstall even if already current
 #   ./install.sh --no-cowork  # skip QEMU/virtiofsd Arch adaptation
 #   ./install.sh --dir PATH   # install dir (default ~/Apps/claude-desktop)
+#   ./install.sh --name ID    # install id for parallel installs (default: dir basename)
 #   ./install.sh --deb FILE   # use a local .deb instead of downloading
 #   ./install.sh --insecure-skip-verify  # skip GPG signature check (discouraged)
 #   ./install.sh --check      # verify repo signature only, then exit (no install)
@@ -51,6 +52,7 @@ DO_COWORK=1
 FORCE=0
 LOCAL_DEB=""
 CHECK_ONLY=0
+NAME=""   # install id override (--name); default is the install dir's basename
 
 # ----------------------------------------------------------------- args -----
 while [ $# -gt 0 ]; do
@@ -59,6 +61,7 @@ while [ $# -gt 0 ]; do
     --no-cowork) DO_COWORK=0 ;;
     --dir) APP="$2"; shift ;;
     --deb) LOCAL_DEB="$2"; shift ;;
+    --name) NAME="$2"; shift ;;
     --insecure-skip-verify) VERIFY=0 ;;
     --check) CHECK_ONLY=1 ;;
     -h|--help) sed -n '2,30p' "$0" 2>/dev/null || echo "see https://github.com/vcostin/claude-desktop-archinstall"; exit 0 ;;
@@ -66,6 +69,19 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+# Install identity — distinguishes parallel installs. Defaults to the install
+# dir's basename, so the default ~/Apps/claude-desktop keeps id "claude-desktop"
+# and behaves exactly as before. All user-level integration (CLI command,
+# .desktop, icon) is named after it. The "primary" install (id claude-desktop)
+# owns the shared claude:// URL handler + MIME definitions; a secondary install
+# gets a menu entry and CLI command but doesn't claim or remove those.
+ID="${NAME:-$(basename "$APP")}"
+if [ "$ID" = "claude-desktop" ]; then
+  PRIMARY=1; LABEL="Claude"
+else
+  PRIMARY=0; LABEL="Claude ($ID)"
+fi
 
 # --------------------------------------------------------------- helpers ----
 c_blue=$'\033[1;34m'; c_grn=$'\033[1;32m'; c_yel=$'\033[1;33m'; c_red=$'\033[1;31m'; c_off=$'\033[0m'
@@ -258,7 +274,8 @@ else
   mkdir -p "$APP"
   # Replace payload but keep our own helper scripts + version marker.
   find "$APP" -mindepth 1 -maxdepth 1 \
-    ! -name launch.sh ! -name uninstall.sh ! -name install.sh ! -name .deb-version \
+    ! -name launch.sh ! -name uninstall.sh ! -name install.sh \
+    ! -name .deb-version ! -name .install-id \
     -exec rm -rf {} + 2>/dev/null || true
   cp -a "$SRC/." "$APP/"
   echo "$LATEST" > "$APP/.deb-version"
@@ -272,6 +289,8 @@ fi
 # created it; an up-to-date run relies on it pre-existing — this makes the
 # section self-sufficient). mkdir -p creates ~/Apps and any missing parents.
 mkdir -p "$APP"
+# Record the install id so uninstall.sh removes the right (id-named) integration.
+echo "$ID" > "$APP/.install-id"
 
 # launch.sh (relocatable launcher)
 cat > "$APP/launch.sh" <<'LAUNCH_EOF'
@@ -304,13 +323,19 @@ for arg in "$@"; do case "$arg" in
   *) echo "Unknown option: $arg" >&2; exit 2 ;;
 esac; done
 
-echo "Removing desktop integration..."
-rm -fv "$HOME/.local/bin/claude-desktop"
-rm -fv "$HOME/.local/share/applications/claude-desktop.desktop"
-rm -fv "$HOME/.local/share/mime/packages/com.anthropic.Claude.xml"
+# Integration is named after this install's id (recorded at install time).
+id="$(cat "$APP/.install-id" 2>/dev/null || basename "$APP")"
+echo "Removing desktop integration for '$id'..."
+rm -fv "$HOME/.local/bin/$id"
+rm -fv "$HOME/.local/share/applications/$id.desktop"
 for sz in 16x16 32x32 48x48 128x128 256x256; do
-  rm -fv "$HOME/.local/share/icons/hicolor/$sz/apps/claude-desktop.png"
+  rm -fv "$HOME/.local/share/icons/hicolor/$sz/apps/$id.png"
 done
+# The shared claude:// MIME definitions belong to the primary install only, so
+# a secondary uninstall must not remove them.
+if [ "$id" = "claude-desktop" ]; then
+  rm -fv "$HOME/.local/share/mime/packages/com.anthropic.Claude.xml"
+fi
 update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 update-mime-database "$HOME/.local/share/mime" 2>/dev/null || true
 gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
@@ -322,8 +347,8 @@ else
 fi
 
 # Root-owned Arch adaptation shims live outside this directory; remind only.
-for shim in /usr/bin/virtiofsd /usr/share/OVMF/OVMF_CODE_4M.fd; do
-  if [ -L "$shim" ] && readlink "$shim" | grep -q -e "Apps/claude-desktop" -e "edk2/x64"; then
+for shim in /usr/bin/virtiofsd /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/AAVMF/AAVMF_CODE.fd; do
+  if [ -L "$shim" ] && readlink "$shim" | grep -q -e "$APP" -e "edk2"; then
     echo "NOTE: Arch shim remains (remove with: sudo rm $shim): $shim"
   fi
 done
@@ -358,33 +383,42 @@ fi
 if [ -f "$DEST" ]; then chmod +x "$DEST"; fi
 
 # -------------------------------------------- user-level desktop wiring -----
-log "Wiring up menu entry, CLI command, icons and MIME types…"
+# Everything here is named after $ID so parallel installs don't collide. The
+# primary install (id claude-desktop) additionally owns the shared claude://
+# handler and MIME definitions; a secondary install skips those.
+log "Wiring up menu entry, CLI command and icons (id: $ID)…"
 mkdir -p "$HOME/.local/bin"
-ln -sf "$APP/launch.sh" "$HOME/.local/bin/claude-desktop"
+ln -sf "$APP/launch.sh" "$HOME/.local/bin/$ID"
 
 # icons: prefer the just-extracted set, else the single bundled icon
 for sz in 16x16 32x32 48x48 128x128 256x256; do
   src="$ICONSRC/$sz/apps/claude-desktop.png"
   [ -f "$src" ] || src="$APP/resources/icon.png"
   dst="$HOME/.local/share/icons/hicolor/$sz/apps"
-  mkdir -p "$dst"; if [ -f "$src" ]; then cp -f "$src" "$dst/claude-desktop.png"; fi
+  mkdir -p "$dst"; if [ -f "$src" ]; then cp -f "$src" "$dst/$ID.png"; fi
 done
 
 mkdir -p "$HOME/.local/share/applications"
-cat > "$HOME/.local/share/applications/claude-desktop.desktop" <<EOF
+{
+  cat <<EOF
 [Desktop Entry]
-Name=Claude
+Name=$LABEL
 Comment=Desktop application for Claude.ai
 GenericName=AI Assistant
 Keywords=AI;Chat;Assistant;Claude;Code;LLM;
 Exec=$APP/launch.sh %U
-Icon=claude-desktop
+Icon=$ID
 Type=Application
 StartupNotify=true
 StartupWMClass=com.anthropic.Claude
 SingleMainWindow=true
 Categories=Utility;Development;
-MimeType=x-scheme-handler/claude;application/vnd.anthropic.mcpb;application/vnd.anthropic.skill;
+EOF
+  # Only the primary advertises the shared file-type/URL associations.
+  if [ "$PRIMARY" -eq 1 ]; then
+    echo "MimeType=x-scheme-handler/claude;application/vnd.anthropic.mcpb;application/vnd.anthropic.skill;"
+  fi
+  cat <<EOF
 Actions=NewChat;NewCode;
 
 [Desktop Action NewChat]
@@ -395,16 +429,19 @@ Exec=$APP/launch.sh "claude://claude.ai/new?surface=chat&source=desktop_action"
 Name=New Claude Code Session
 Exec=$APP/launch.sh "claude://code/new?source=desktop_action"
 EOF
+} > "$HOME/.local/share/applications/$ID.desktop"
 
-if [ -f "$APP/resources/linux-mime/com.anthropic.Claude.xml" ]; then
+if [ "$PRIMARY" -eq 1 ] && [ -f "$APP/resources/linux-mime/com.anthropic.Claude.xml" ]; then
   mkdir -p "$HOME/.local/share/mime/packages"
   cp -f "$APP/resources/linux-mime/com.anthropic.Claude.xml" "$HOME/.local/share/mime/packages/"
 fi
 update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 update-mime-database "$HOME/.local/share/mime" 2>/dev/null || true
 gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
-xdg-mime default claude-desktop.desktop x-scheme-handler/claude 2>/dev/null || true
-ok "desktop integration ready"
+if [ "$PRIMARY" -eq 1 ]; then
+  xdg-mime default "$ID.desktop" x-scheme-handler/claude 2>/dev/null || true
+fi
+ok "desktop integration ready (id: $ID)"
 
 # --------------------------------- Arch adaptation (Cowork): pkgs + shims ---
 if [ "$DO_COWORK" -eq 1 ]; then

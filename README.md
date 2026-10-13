@@ -83,8 +83,32 @@ reports as supported.
 ./install.sh --force      # reinstall even if already current
 ./install.sh --no-cowork  # skip the QEMU/virtiofsd Arch adaptation
 ./install.sh --dir PATH   # install dir (default ~/Apps/claude-desktop)
+./install.sh --name ID    # install id for parallel installs (default: dir basename)
 ./install.sh --deb FILE   # install from a local .deb instead of downloading
+./install.sh --check      # verify the repo signature only, then exit
 ```
+
+### Parallel installs
+
+All user-level integration is named after an **install id** (the `--dir`
+basename, or `--name`), so you can run more than one build side by side:
+
+```sh
+# a second, independent install (e.g. a beta), with its own menu entry + command
+./install.sh --dir ~/Apps/claude-beta --name claude-beta
+```
+
+That gives a `claude-beta` command, a "Claude (claude-beta)" menu entry, and its
+own icon — without disturbing the default `claude-desktop` install. The default
+install (id `claude-desktop`) is the **primary**: it alone owns the shared
+`claude://` URL handler and file-type associations, so a secondary install never
+hijacks them (or removes them when *it* is uninstalled).
+
+A few things are genuinely shared and can't be isolated: the `claude://` handler
+(only one default is possible), the Cowork system symlinks (`/usr/bin/virtiofsd`
+etc. — use `--no-cowork` on secondaries, or accept last-writer-wins), and the
+window grouping (both builds report the same `StartupWMClass`, so docks group
+their windows together).
 
 ## Requirements
 
