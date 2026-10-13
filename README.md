@@ -1,5 +1,7 @@
 # claude-desktop-archinstall
 
+[![shellcheck](https://github.com/vcostin/claude-desktop-archinstall/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/vcostin/claude-desktop-archinstall/actions/workflows/shellcheck.yml)
+
 Install [Claude Desktop](https://claude.ai) on **Arch Linux** from Anthropic's
 official `.deb` — isolated in your home folder, rootless, with full desktop
 integration and **Cowork** (the QEMU micro-VM feature) working.
