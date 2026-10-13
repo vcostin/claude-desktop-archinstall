@@ -264,21 +264,9 @@ to update:
 curl -fsSL https://raw.githubusercontent.com/vcostin/claude-desktop-archinstall/main/install.sh | bash
 ```
 
-Current: see the [latest release](https://github.com/vcostin/claude-desktop-archinstall/releases/latest).
-
-| Version | Highlights |
-| --- | --- |
-| v1.6.0 | Parallel installs — per-install-id integration (`--name`) |
-| v1.5.1 | Key-rotation runbook (`KEY-ROTATION.md`) |
-| v1.5.0 | Multi-key allowlist for smooth signing-key rotation |
-| v1.4.0 | arm64 support (architecture auto-detection) |
-| v1.3.0 | Reusable `deb-to-arch` skill playbook |
-| v1.2.0 | Key-rotation canary, primary-fingerprint match, ShellCheck CI + badge |
-| v1.1.0 | GPG signature verification against Anthropic's pinned key |
-| v1.0.1 | Shell command-hash hint after install |
-| v1.0.0 | First validated release |
-
-Full notes: [all releases](https://github.com/vcostin/claude-desktop-archinstall/releases).
+See the [latest release](https://github.com/vcostin/claude-desktop-archinstall/releases/latest)
+for the current version, and [all releases](https://github.com/vcostin/claude-desktop-archinstall/releases)
+for the full, always-current changelog.
 
 ## License
 
