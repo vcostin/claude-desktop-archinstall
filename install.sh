@@ -365,20 +365,28 @@ echo "Done. Claude Desktop removed."
 UNINSTALL_EOF
 chmod +x "$APP/uninstall.sh"
 
-# Drop a copy of this script next to the app for future updates. Works both
-# when run from a file and when piped from curl (then $0 isn't a real file,
-# so re-fetch from the canonical URL).
+# Drop a copy of this script next to the app for future updates, and refresh
+# it whenever it differs from the version that's running now. Works both when
+# run from a file and when piped from curl (then $0 isn't a real file, so
+# fetch the canonical copy from the URL instead).
 rm -f "$APP/update-claude-desktop.sh"   # migrate from the pre-repo name
 DEST="$APP/install.sh"
 # Resolve where we're running from. When piped (`curl | bash`) this is "bash",
 # not a real script file, so only treat it as our source if it's an actual
 # file whose first line is our shebang — otherwise fetch the canonical copy.
 SELF="$(readlink -f "${BASH_SOURCE[0]:-$0}" 2>/dev/null || true)"
-if [ -n "$SELF" ] && [ -f "$SELF" ] && [ "$SELF" != "$DEST" ] \
-   && IFS= read -r _l < "$SELF" && [ "$_l" = "#!/usr/bin/env bash" ]; then
-  cp -f "$SELF" "$DEST"
+is_installer() { [ -s "$1" ] && IFS= read -r _l < "$1" && [ "$_l" = "#!/usr/bin/env bash" ]; }
+SRC=""
+if [ -n "$SELF" ] && [ -f "$SELF" ] && is_installer "$SELF"; then
+  if [ "$SELF" != "$DEST" ]; then SRC="$SELF"; fi   # running the copy itself: nothing to do
+elif curl -fsSL "$SELF_URL" -o "$TMP/install.sh" 2>/dev/null && is_installer "$TMP/install.sh"; then
+  SRC="$TMP/install.sh"
 elif [ ! -f "$DEST" ]; then
-  curl -fsSL "$SELF_URL" -o "$DEST" 2>/dev/null || warn "could not fetch a local copy of install.sh"
+  warn "could not fetch a local copy of install.sh"
+fi
+# Only touch the copy when its contents actually changed.
+if [ -n "$SRC" ] && ! cmp -s "$SRC" "$DEST"; then
+  cp -f "$SRC" "$DEST.new" && mv -f "$DEST.new" "$DEST"
 fi
 if [ -f "$DEST" ]; then chmod +x "$DEST"; fi
 
