@@ -52,7 +52,9 @@ Or clone the repo and run `./install.sh`.
    index and picking the newest with `sort -V`.
 2. **Skips work if you're current** (tracked via a `.deb-version` marker),
    unless you pass `--force`.
-3. **Downloads and verifies** the `.deb` against the repo's published SHA256.
+3. **Downloads and verifies** the `.deb` against Anthropic's signed repository
+   index, so it checks that the file really came from Anthropic, not just its
+   checksum (see [Security](#security)).
 4. **Installs the payload** into `~/Apps/claude-desktop` — a fully
    self-contained Electron bundle (no system Electron needed).
 5. **Wires desktop integration**: a `claude-desktop` CLI command
@@ -62,6 +64,22 @@ Or clone the repo and run `./install.sh`.
    `edk2-ovmf` via `pacman` if missing, and creates two compatibility
    symlinks (see below). **`sudo` is only used for these system steps, and
    only when something is actually missing** — it prompts once.
+
+### Why a script and not an AUR package?
+
+AUR packages for Claude Desktop are a great choice, and if you already use an
+AUR helper they may suit you better. This script covers a slightly different
+niche:
+
+- **Rootless and self-contained.** The app lives in your home folder, and
+  `sudo` is only used for the optional Cowork steps.
+- **Straight from Anthropic.** It downloads the official `.deb` and verifies it
+  against Anthropic's own signing key, so there's no repackaging step in
+  between.
+- **Easy to run side by side.** Parallel installs (for example a beta) each get
+  their own folder, command and menu entry.
+
+Pick whichever fits how you like to manage your system.
 
 ### The Cowork symlinks
 
